@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>受注書類アプリ</title>
+<style>
+  /* ===== 白黒表示でも使える配色: 区別は「太さ・枠・記号」で行う ===== */
+  * { box-sizing: border-box; }
+  body { font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif;
+         margin: 0; background: #f2f2f2; color: #111; line-height: 1.6; }
+  .app-ui header { background: #fff; border-bottom: 3px solid #111; padding: 10px 16px;
+                   display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; }
+  .app-ui h1 { font-size: 18px; margin: 0; }
+  .storage-note { font-size: 12px; }
+  #save-indicator { font-size: 12px; margin-left: auto; }
+  nav { background: #fff; border-bottom: 1px solid #888; padding: 0 8px;
+        display: flex; flex-wrap: wrap; }
+  nav button { border: none; background: none; padding: 10px 12px; font-size: 14px;
+               cursor: pointer; border-bottom: 4px solid transparent; }
+  nav button[aria-current="true"] { font-weight: bold; border-bottom-color: #111; }
+  nav button[aria-current="true"]::before { content: "▶ "; }
+  main { max-width: 900px; margin: 0 auto; padding: 16px; }
+  section.screen { display: none; }
+  section.screen.active { display: block; }
+  h2 { font-size: 17px; border-left: 6px solid #111; padding-left: 8px; }
+  h3 { font-size: 15px; }
+  .card { background: #fff; border: 1px solid #777; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+  button.btn { border: 1.5px solid #222; background: #fff; padding: 7px 12px; border-radius: 6px;
+               cursor: pointer; font-size: 14px; }
+  button.btn:hover { background: #eee; }
+  button.btn-primary { background: #111; color: #fff; font-weight: bold; }
+  button.btn-primary:hover { background: #333; }
+  button.btn-small { padding: 3px 8px; font-size: 13px; }
+  input[type="text"], input[type="date"], input[type="email"], textarea, select {
+      border: 1px solid #555; border-radius: 4px; padding: 6px; font-size: 14px; font-family: inherit; }
+  textarea { width: 100%; }
+  label { font-size: 13px; font-weight: bold; display: block; margin-top: 8px; }
+  .field-row { display: flex; flex-wrap: wrap; gap: 10px; }
+  .field-row > div { flex: 1 1 200px; }
+  .field-row input { width: 100%; }
+  .table-scroll { overflow-x: auto; }
+  table.ui-table { border-collapse: collapse; width: 100%; background: #fff; }
+  table.ui-table th, table.ui-table td { border: 1px solid #555; padding: 6px; font-size: 14px; }
+  table.ui-table th { background: #e6e6e6; }
+  table.ui-table input { width: 100%; min-width: 60px; border: 1px solid #999; }
+  table.ui-table input.num { text-align: right; }
+  .error-box { border: 2px solid #000; background: #fff; padding: 8px 10px; font-weight: bold;
+               margin: 8px 0; display: none; }
+  .error-box.show { display: block; }
+  .hint { font-size: 12px; color: #333; }
+  .notice-box { border: 2px dashed #333; background: #fff; padding: 8px 10px; font-size: 13px; margin: 8px 0; }
+  .tap-panel { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tap-panel button { border: 1.5px solid #222; background: #fff; border-radius: 8px;
+                      padding: 8px 10px; cursor: pointer; font-size: 14px; text-align: left; }
+  .tap-panel button:hover { background: #eee; }
+  .totals-view { text-align: right; font-size: 15px; margin-top: 8px; }
+  .totals-view .grand { font-size: 18px; font-weight: bold; }
+  .case-card { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .case-card .case-info { flex: 1 1 260px; }
+  .doc-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+  .doc-tabs button { border: 1.5px solid #222; background: #fff; padding: 6px 12px;
+                     border-radius: 6px 6px 0 0; cursor: pointer; }
+  .doc-tabs button[aria-current="true"] { background: #111; color: #fff; font-weight: bold; }
+  .doc-tabs button[aria-current="true"]::before { content: "▶ "; }
+  .term-buttons { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+
+  /* ===== 書類(A4)の見た目 ===== */
+  #print-area { background: #fff; border: 1px solid #888; max-width: 780px; margin: 8px auto;
+                padding: 32px 36px; }
+  .doc-title { text-align: center; font-size: 24px; letter-spacing: 12px; margin: 0 0 16px; font-weight: bold; }
+  .doc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .doc-to { font-size: 16px; border-bottom: 1px solid #111; padding-bottom: 2px; min-width: 45%; }
+  .doc-meta { font-size: 13px; text-align: right; }
+  .doc-lead { margin: 14px 0 6px; font-size: 14px; }
+  .doc-subject { font-size: 14px; margin: 4px 0; }
+  .doc-amount-box { border: 2px solid #111; display: inline-block; padding: 8px 18px;
+                    font-size: 17px; font-weight: bold; margin: 8px 0; }
+  table.doc-table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 13px; }
+  table.doc-table th, table.doc-table td { border: 1px solid #111; padding: 5px 7px; }
+  table.doc-table th { background: #eee; }
+  table.doc-table td.num { text-align: right; }
+  table.doc-totals { border-collapse: collapse; margin: 8px 0 0 auto; font-size: 13px; }
+  table.doc-totals td { border: 1px solid #111; padding: 5px 10px; min-width: 110px; }
+  table.doc-totals td.num { text-align: right; }
+  table.doc-totals tr.grand td { font-weight: bold; font-size: 14px; }
+  .doc-box { border: 1px solid #111; padding: 8px 10px; margin-top: 14px; font-size: 13px; }
+  .doc-box h4 { margin: 0 0 4px; font-size: 13px; }
+  .doc-issuer { margin-top: 18px; text-align: right; font-size: 13px; }
+  .doc-sign { margin-top: 24px; font-size: 13px; }
+  .doc-sign .line { border-bottom: 1px solid #111; min-height: 26px; margin: 10px 0; }
+  .doc-contract-body { font-size: 13px; white-space: pre-wrap; }
+  .doc-footnote { font-size: 11px; margin-top: 12px; }
+
+  @media (max-width: 600px) {
+    #print-area { padding: 16px; }
+    .doc-head { flex-direction: column; }
+    .doc-meta { text-align: left; }
+  }
+
+  /* ===== 印刷: 書類だけをA4で出す(画面のボタン類は出さない) ===== */
+  @page { size: A4 portrait; margin: 14mm; }
+  @media print {
+    body * { visibility: hidden; }
+    #print-area, #print-area * { visibility: visible; }
+    #print-area { position: absolute; left: 0; top: 0; width: 100%;
+                  border: none; margin: 0; padding: 0; max-width: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app-ui" id="app">
+  <header>
+    <h1>受注書類アプリ</h1>
+    <span class="storage-note">■ データはこの端末の中だけに保存されます(外部への送信なし)</span>
+    <span id="save-indicator"></span>
+  </header>
+  <nav id="nav">
+    <button data-screen="home">① 案件一覧</button>
+    <button data-screen="edit">② 案件の編集(見積づくり)</button>
+    <button data-screen="preview">③ 書類プレビュー</button>
+    <button data-screen="items">④ 料金表</button>
+    <button data-screen="settings">⑤ 設定</button>
+  </nav>
+  <main>
+    <div class="error-box" id="global-error"></div>
+    <section class="screen" id="screen-home"></section>
+    <section class="screen" id="screen-edit"></section>
+    <section class="screen" id="screen-preview"></section>
+    <section class="screen" id="screen-items"></section>
+    <section class="screen" id="screen-settings"></section>
+  </main>
+</div>
+
+<script>
+'use strict';
+/* ================= データ ================= */
+const KEY = 'juchu-shorui-v1';
+
+const DEFAULT_TERMS = {
+  revision:  'デザインの修正は2回までとさせていただきます。以降は追加費用のご相談となります。',
+  extra:     'ページの追加・写真撮影・原稿作成のご依頼は、別途お見積りいたします。',
+  payment:   'お支払いは、着手時に50%、納品時に残り50%を銀行振込にてお願いいたします(振込手数料はご負担ください)。',
+  copyright: '制作物の著作権(著作権法第27条・第28条の権利を含む)は、代金のお支払い完了時に貴社へ譲渡いたします。著作者人格権は行使いたしません。',
+  cancel:    '着手後に中止となった場合は、それまでの作業分を精算させていただきます。',
+  delay:     'ご確認のお返事や素材のご提供が遅れた場合は、その日数分、納期を調整させていただきます。',
+  portfolio: '本制作物は当方の実績紹介(ポートフォリオ・SNS等)に掲載させていただく場合があります。掲載不可の場合はお申し出ください。'
+};
+const TERM_LABELS = { revision:'修正回数', extra:'追加費用', payment:'支払条件',
+                      copyright:'著作権', cancel:'キャンセル', delay:'納期', portfolio:'ポートフォリオ掲載' };
+
+const DEFAULT_CONTRACT = [
+'WEBサイト制作請負契約書',
+'',
+'発注者 {{発注者}}(以下「甲」といいます)と、受注者 {{受注者}}(以下「乙」といいます)は、次のとおり契約を結びます。',
+'',
+'第1条(業務内容) 乙は、甲から依頼された「{{件名}}」の制作を行います。くわしい内容は、見積書({{見積番号}})のとおりとします。',
+'第2条(納期) 納期は 　　　　年　　月　　日 とします。甲の確認のお返事や素材のご提供が遅れた場合は、その日数分、納期を調整します。',
+'第3条(報酬と支払) 報酬は {{税込金額}}(消費税込み)とします。支払いの方法と時期は、見積書の取引条件のとおりとします。',
+'第4条(検収) 乙が仮公開のURLなどで納品物を提示し、甲が7日以内に確認して合格の連絡をした時点で、検収完了とします。7日以内に連絡がない場合は、合格したものとみなします。',
+'第5条(修正) デザインの修正は、見積書の取引条件に定める回数までとし、それを超える分は別途協議します。',
+'第6条(著作権) 納品物の著作権(著作権法第27条・第28条の権利を含みます)は、報酬の支払いが完了した時に甲へ移ります。乙は著作者人格権を行使しません。',
+'第7条(再委託) 乙は、業務の一部を第三者に任せる場合、責任をもって管理します。',
+'第8条(秘密保持) 甲と乙は、この契約で知った相手の秘密を、相手の許可なく他人に漏らしません。',
+'第9条(中止時の精算) この契約が途中で終了した場合、甲は、それまでに乙が行った作業分の報酬を支払います。',
+'第10条(協議・管轄) 決めていないことや争いが起きたときは、まず話し合いで解決します。裁判になる場合は、乙の所在地を管轄する裁判所を第一審の裁判所とします。',
+'',
+'この契約の成立の証として本書を2通(電子でやり取りする場合は電磁的記録)作成し、甲乙がそれぞれ保管します。',
+'',
+'契約日: {{契約日}}',
+'',
+'甲(発注者): {{発注者}}',
+'住所:',
+'記名:　　　　　　　　　　　　　　　印',
+'',
+'乙(受注者): {{受注者}}',
+'住所: {{乙住所}}',
+'記名:　　　　　　　　　　　　　　　印'
+].join('\n');
+
+/* 損害賠償上限条項・データ消失/誤送信の免責条項:
+   専門家確認が済むまでは契約書ひな形の本文には入れない(案A確定)。
+   プレビューと設定画面に「別枠の条文案」として表示するだけの位置づけ */
+const DEFAULT_LIABILITY_CAP_CLAUSE =
+  '甲は乙に対し、本契約に起因して生じた損害について、乙が甲に支払った委託料の総額を上限として賠償責任を負う。ただし、乙の故意又は重過失による場合はこの限りではない。';
+const DEFAULT_DATA_LOSS_CLAUSE =
+  '甲が検収完了(納品後7日、既存の検収条項と同じ基準)後に生じたデータの消失又は誤送信について、乙は責任を負わない。ただし、乙の故意又は重過失による場合はこの限りではない。';
+
+const SAMPLE_ITEMS = [
+  ['コーポレートサイト制作(初回特別価格)', '式', 25000],
+  ['企画・構成(サイト設計)', '式', 30000], ['トップページデザイン', 'ページ', 50000],
+  ['下層ページデザイン', 'ページ', 20000], ['コーディング(実装)', 'ページ', 15000],
+  ['お問い合わせフォーム設置', '式', 20000], ['スマホ対応', '式', 20000],
+  ['写真・素材の手配', '式', 10000], ['サーバー・ドメイン設定代行', '式', 15000],
+  ['保守・更新(月額)', '月', 5000]
+].map((a, i) => ({ id: 'it' + (i + 1), name: a[0], unit: a[1], unitPrice: a[2], taxRate: 10, sort: i + 1 }));
+
+function defaultState() {
+  return {
+    version: 1,
+    settings: {
+      issuer: { name: '', shopName: '', address: '', tel: '', email: '', invoiceNumber: '', bankInfo: '' },
+      tax: { rounding: 'floor' },
+      terms: Object.assign({}, DEFAULT_TERMS),
+      contractTemplate: DEFAULT_CONTRACT,
+      liabilityCapClause: { text: DEFAULT_LIABILITY_CAP_CLAUSE },
+      dataLossClause: { text: DEFAULT_DATA_LOSS_CLAUSE },
+      numbering: { quote: {}, order: {}, accept: {}, contract: {} }
+    },
+    items: SAMPLE_ITEMS.map(x => Object.assign({}, x)),
+    cases: []
+  };
+}
+
+let state = loadState();
+let currentCaseId = state.cases.length ? state.cases[0].id : null;
+let currentDocType = 'quote';
+let currentScreen = 'home';
+
+/* 保存データ由来の id を許可リスト(英数字・-・_ のみ)で検査し、外れたものは再発行する。
+   id は画面のHTML属性に埋め込まれるため、改ざんされたJSONを読み込んでも安全な形だけを通す(XSS対策の入口側) */
+function normalizeIds(obj) {
+  const okId = /^[A-Za-z0-9_-]{1,40}$/;  // uid() が作る形+余裕
+  (obj.items || []).forEach(it => { if (!okId.test(String(it.id))) it.id = uid('it'); });
+  (obj.cases || []).forEach(c  => { if (!okId.test(String(c.id)))  c.id  = uid('c'); });
+}
+
+function loadState() {
+  let raw = null;
+  try { raw = localStorage.getItem(KEY); } catch (e) { alertBox('この環境では保存機能が使えません(プライベートモードの可能性)。'); }
+  if (!raw) return defaultState();
+  try {
+    const obj = JSON.parse(raw);
+    if (!obj || obj.version !== 1 || !obj.settings || !Array.isArray(obj.items) || !Array.isArray(obj.cases)) throw new Error('形式が違う');
+    // 古いデータに新しい設定項目が無い場合の穴埋め
+    const d = defaultState();
+    obj.settings.issuer = Object.assign(d.settings.issuer, obj.settings.issuer || {});
+    obj.settings.tax = Object.assign(d.settings.tax, obj.settings.tax || {});
+    obj.settings.terms = Object.assign(d.settings.terms, obj.settings.terms || {});
+    if (!obj.settings.contractTemplate) obj.settings.contractTemplate = d.settings.contractTemplate;
+    obj.settings.liabilityCapClause = Object.assign(d.settings.liabilityCapClause, obj.settings.liabilityCapClause || {});
+    obj.settings.dataLossClause = Object.assign(d.settings.dataLossClause, obj.settings.dataLossClause || {});
+    obj.settings.numbering = Object.assign(d.settings.numbering, obj.settings.numbering || {});
+    normalizeIds(obj);
+    return obj;
+  } catch (e) {
+    try { localStorage.setItem(KEY + '-broken-' + Date.now(), raw); } catch (e2) {}
+    alertBox('保存データが読めなかったため、空の状態で開始しました(壊れたデータは別名で退避済み)。');
+    return defaultState();
+  }
+}
+
+function persist(touchedCase) {
+  if (touchedCase) touchedCase.updatedAt = new Date().toISOString();
+  try {
+    localStorage.setItem(KEY, JSON.stringify(state));
+    const t = new Date();
+    document.getElementById('save-indicator').textContent =
+      '✓ 保存済み ' + String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0') + ':' + String(t.getSeconds()).padStart(2, '0');
+  } catch (e) {
+    alertBox('保存に失敗しました。バックアップ(設定画面のJSON書き出し)をおすすめします。');
+  }
+}
+
+/* ================= 共通ヘルパー ================= */
+const $ = sel => document.querySelector(sel);
+/* ルール: HTML文字列に連結する動的な値は、数値の添字と固定キー以外すべて esc() を通す(id も例外にしない) */
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, m =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+}
+function nl2br(s) { return esc(s).replace(/\n/g, '<br>'); }
+function fmt(n) { return Number(n).toLocaleString('ja-JP'); }
+function uid(prefix) { return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function addMonths(iso, m) {
+  const p = iso.split('-').map(Number);
+  const d = new Date(p[0], p[1] - 1, p[2]);
+  const day = d.getDate();
+  d.setMonth(d.getMonth() + m);
+  if (d.getDate() !== day) d.setDate(0); // 例: 1/31 の1ヶ月後は 2月末日
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function fmtDate(iso) {
+  if (!iso) return '';
+  const p = iso.split('-');
+  return p[0] + '年' + Number(p[1]) + '月' + Number(p[2]) + '日';
+}
+function isNonNegInt(v) { return /^\d+$/.test(String(v).trim()); }
+/* インボイス登録番号の「よくある入力ゆれ」を自動整形する(全角→半角、空白・ハイフン除去、小文字t→T) */
+function normalizeInvoiceNo(v) {
+  return v.trim()
+    .replace(/[０-９Ｔｔ]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0)) // 全角→半角
+    .replace(/[\s\-ー–—－−‐]/g, '')                                                // 空白・ハイフン類を除去(全角ハイフン－/マイナス−/ハイフン‐も対象)
+    .replace(/^t/, 'T');                                                           // 小文字t→大文字T
+}
+function alertBox(msg) {
+  const box = document.getElementById('global-error');
+  if (!box) { alert(msg); return; }
+  box.textContent = '⚠ ' + msg;
+  box.classList.add('show');
+  clearTimeout(alertBox._t);
+  alertBox._t = setTimeout(() => box.classList.remove('show'), 6000);
+}
+
+function getCase(id) { return state.cases.find(c => c.id === id) || null; }
+function currentCase() { return getCase(currentCaseId); }
+
+/* ================= 金額計算(すべて整数の円) ================= */
+/* 消費税は「書類1枚につき税率ごとに1回」端数処理する(行ごとには処理しない) */
+function roundTax(netSum, ratePercent, mode) {
+  const x = netSum * ratePercent; // 100倍された税額(整数のまま扱う)
+  if (mode === 'round') return Math.floor((x + 50) / 100);
+  if (mode === 'ceil') return Math.ceil(x / 100);
+  return Math.floor(x / 100); // 既定: 切り捨て
+}
+function caseTotals(c) {
+  const mode = state.settings.tax.rounding;
+  const byRate = {};
+  let net = 0;
+  for (const ln of c.lines) {
+    const amount = ln.unitPrice * ln.qty;
+    net += amount;
+    byRate[ln.taxRate] = (byRate[ln.taxRate] || 0) + amount;
+  }
+  let tax = 0;
+  const taxRows = Object.keys(byRate).map(Number).sort().map(rate => {
+    const t = roundTax(byRate[rate], rate, mode);
+    tax += t;
+    return { rate: rate, net: byRate[rate], tax: t };
+  });
+  return { net: net, tax: tax, gross: net + tax, taxRows: taxRows, mode: mode };
+}
+const ROUND_LABEL = { floor: '切り捨て', round: '四捨五入', ceil: '切り上げ' };
+
+/* ================= 書類番号 ================= */
+/* 採番時に「既存の全書類の番号」も走査し、カウンタと最大値の大きい方+1にする。
+   手入力・JSON読み込み・複製など、どの経路で番号が増えても重複しない(カウンタは戻さない=再利用もしない) */
+function assignNumber(type) {
+  const year = String(new Date().getFullYear());
+  const counters = state.settings.numbering[type];
+  let maxUsed = 0;
+  const re = new RegExp('^' + year + '-(\\d+)$');   // 2026-3 のような桁ゆれも拾う
+  for (const cs of state.cases) {
+    const m = re.exec(((cs.docs || {})[type] || {}).number || '');
+    if (m) maxUsed = Math.max(maxUsed, parseInt(m[1], 10));
+  }
+  const next = Math.max(counters[year] || 0, maxUsed) + 1;
+  counters[year] = next;                             // カウンタも前進させて保持
+  return year + '-' + String(next).padStart(3, '0');
+}
+/* プレビューを最初に開いた時に番号・日付を入れる(手直し可。カウンタは進んだままなので重複しない) */
+function ensureDocMeta(c, type) {
+  const doc = c.docs[type];
+  let changed = false;
+  if (!doc.number) { doc.number = assignNumber(type); changed = true; }
+  if (type === 'quote') {
+    if (!doc.issueDate) { doc.issueDate = todayStr(); changed = true; }
+    if (!doc.expiry) { doc.expiry = addMonths(doc.issueDate, 1); changed = true; }
+  } else if (type === 'accept' || type === 'contract') {
+    if (!doc.issueDate) { doc.issueDate = todayStr(); changed = true; }
+  }
+  // 注文書の注文日は先方が書くため、わざと空欄のまま
+  if (changed) persist(c);
+}
+
+/* ================= 案件 ================= */
+function newCase() {
+  const c = {
+    id: uid('c'), title: '', clientName: '', lines: [], terms: '', note: '',
+    docs: { quote: { number: '', issueDate: '', expiry: '' },
+            order: { number: '', issueDate: '' },
+            accept: { number: '', issueDate: '' },
+            contract: { number: '', issueDate: '' } },
+    updatedAt: new Date().toISOString()
+  };
+  state.cases.push(c);
+  persist();
+  return c;
+}
+
+/* ================= 画面切替 ================= */
+function showScreen(name) {
+  currentScreen = name;
+  document.querySelectorAll('nav button').forEach(b =>
+    b.setAttribute('aria-current', b.dataset.screen === name ? 'true' : 'false'));
+  document.querySelectorAll('section.screen').forEach(s => s.classList.remove('active'));
+  $('#screen-' + name).classList.add('active');
+  if (name === 'home') renderHome();
+  if (name === 'edit') renderEdit();
+  if (name === 'preview') renderPreview();
+  if (name === 'items') renderItems();
+  if (name === 'settings') renderSettings();
+}
+document.getElementById('nav').addEventListener('click', e => {
+  const b = e.target.closest('button[data-screen]');
+  if (b) showScreen(b.dataset.screen);
+});
+
+/* ================= ① 案件一覧 ================= */
+function renderHome() {
+  const el = $('#screen-home');
+  const cases = state.cases.slice().sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+  let html = '<h2>案件一覧</h2>' +
+    '<p><button class="btn btn-primary" id="btn-new-case">+ 新しい案件をつくる</button></p>';
+  if (!cases.length) {
+    html += '<div class="card">まだ案件がありません。「+ 新しい案件をつくる」から始めてください。<br>' +
+            '<span class="hint">流れ: 案件をつくる → 料金表をタップして見積書 → プレビューで印刷(PDF保存)</span></div>';
+  }
+  for (const c of cases) {
+    const t = caseTotals(c);
+    const up = (c.updatedAt || '').replace('T', ' ').slice(0, 16);
+    html += '<div class="card case-card">' +
+      '<div class="case-info"><strong>' + esc(c.title || '(件名未入力)') + '</strong><br>' +
+      '<span class="hint">宛先: ' + esc(c.clientName || '(未入力)') + ' / 税込 ' + fmt(t.gross) + '円 / 更新 ' + esc(up) + '</span></div>' +
+      '<button class="btn" data-open="' + esc(c.id) + '">開く</button>' +
+      '<button class="btn btn-small" data-dup="' + esc(c.id) + '">複製</button>' +
+      '<button class="btn btn-small" data-del="' + esc(c.id) + '">削除…</button>' +
+      '</div>';
+  }
+  el.innerHTML = html;
+  $('#btn-new-case').onclick = () => { const c = newCase(); currentCaseId = c.id; showScreen('edit'); };
+  el.querySelectorAll('[data-open]').forEach(b => b.onclick = () => { currentCaseId = b.dataset.open; showScreen('edit'); });
+  el.querySelectorAll('[data-dup]').forEach(b => b.onclick = () => {
+    const src = getCase(b.dataset.dup); if (!src) return;
+    const copy = JSON.parse(JSON.stringify(src));
+    copy.id = uid('c');
+    copy.title = (src.title || '(件名未入力)') + '(複製)';
+    copy.docs = { quote: { number: '', issueDate: '', expiry: '' }, order: { number: '', issueDate: '' },
+                  accept: { number: '', issueDate: '' }, contract: { number: '', issueDate: '' } };
+    copy.updatedAt = new Date().toISOString();
+    state.cases.push(copy); persist(); renderHome();
+  });
+  el.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
+    const c = getCase(b.dataset.del); if (!c) return;
+    if (!confirm('案件「' + (c.title || '(件名未入力)') + '」を削除します。元に戻せません。よろしいですか?')) return;
+    state.cases = state.cases.filter(x => x.id !== c.id);
+    if (currentCaseId === c.id) currentCaseId = state.cases.length ? state.cases[0].id : null;
+    persist(); renderHome();
+  });
+}
+
+/* ================= ② 案件の編集 ================= */
+function renderEdit() {
+  const el = $('#screen-edit');
+  const c = currentCase();
+  if (!c) {
+    el.innerHTML = '<h2>案件の編集</h2><div class="card">案件が選ばれていません。<br>' +
+      '<button class="btn btn-primary" id="btn-new-case2">+ 新しい案件をつくる</button> ' +
+      '<button class="btn" id="btn-go-home">案件一覧へ</button></div>';
+    $('#btn-new-case2').onclick = () => { const nc = newCase(); currentCaseId = nc.id; renderEdit(); };
+    $('#btn-go-home').onclick = () => showScreen('home');
+    return;
+  }
+  const items = state.items.slice().sort((a, b) => a.sort - b.sort);
+  let tapHtml = items.map(it =>
+    '<button data-add="' + esc(it.id) + '">+ ' + esc(it.name) + '<br><span class="hint">' + fmt(it.unitPrice) + '円/' + esc(it.unit) + '</span></button>'
+  ).join('');
+  if (!items.length) tapHtml = '<span class="hint">料金表が空です。「④ 料金表」で品目を登録してください。</span>';
+
+  let termBtns = Object.keys(TERM_LABELS).map(k =>
+    '<button class="btn btn-small" data-term="' + k + '">挿入: ' + TERM_LABELS[k] + '</button>').join('') +
+    '<button class="btn btn-small" data-term="__all__">全部挿入</button>';
+
+  el.innerHTML =
+    '<h2>案件の編集(見積づくり)</h2>' +
+    '<div class="card"><div class="field-row">' +
+    '<div><label>宛先(相手の会社名・お名前)</label><input type="text" id="f-client" value="' + esc(c.clientName) + '" placeholder="例: 株式会社○○"></div>' +
+    '<div><label>件名</label><input type="text" id="f-title" value="' + esc(c.title) + '" placeholder="例: コーポレートサイト制作一式"></div>' +
+    '</div></div>' +
+    '<div class="card"><h3>料金表からタップで追加</h3><div class="tap-panel" id="tap-panel">' + tapHtml + '</div></div>' +
+    '<div class="error-box" id="edit-error"></div>' +
+    '<div class="card"><h3>明細</h3><div class="table-scroll" id="lines-wrap"></div><div class="totals-view" id="totals-view"></div></div>' +
+    '<div class="card"><h3>取引条件(見積書に載ります)</h3>' +
+    '<div class="term-buttons" id="term-buttons">' + termBtns + '</div>' +
+    '<textarea id="f-terms" rows="7" placeholder="上のボタンで定型文を挿入できます(文面は⑤設定で編集できます)">' + esc(c.terms) + '</textarea></div>' +
+    '<div class="card"><h3>備考(見積書に載ります)</h3><textarea id="f-note" rows="3">' + esc(c.note) + '</textarea></div>' +
+    '<p><button class="btn btn-primary" id="btn-to-preview">③ 書類プレビューへ進む ▶</button></p>';
+
+  $('#f-client').addEventListener('input', e => { c.clientName = e.target.value; persist(c); });
+  $('#f-title').addEventListener('input', e => { c.title = e.target.value; persist(c); });
+  $('#f-terms').addEventListener('input', e => { c.terms = e.target.value; persist(c); });
+  $('#f-note').addEventListener('input', e => { c.note = e.target.value; persist(c); });
+  $('#tap-panel').addEventListener('click', e => {
+    const b = e.target.closest('button[data-add]'); if (!b) return;
+    const it = state.items.find(x => x.id === b.dataset.add); if (!it) return;
+    // 品目の「その時点のコピー」を明細に持つ(後で料金表を変えても過去の見積は変わらない)
+    c.lines.push({ itemName: it.name, unit: it.unit, unitPrice: it.unitPrice, qty: 1, taxRate: it.taxRate });
+    persist(c); renderLines(c);
+  });
+  $('#term-buttons').addEventListener('click', e => {
+    const b = e.target.closest('button[data-term]'); if (!b) return;
+    const k = b.dataset.term;
+    // 連打・押し直しで同じ定型文が重複しないよう、挿入前に本文を確認する(「・」プレフィックス込みの1行単位で比較)
+    const candidates = (k === '__all__' ? Object.keys(TERM_LABELS) : [k])
+      .map(x => '・' + state.settings.terms[x]);
+    const ta = $('#f-terms');
+    const toAdd = candidates.filter(t => !ta.value.includes(t));
+    if (!toAdd.length) { editError('この定型文はすでに挿入されています。'); return; }
+    if (toAdd.length < candidates.length) editError('挿入済みの項目はスキップしました。');
+    ta.value = (ta.value ? ta.value.replace(/\n*$/, '\n') : '') + toAdd.join('\n') + '\n';
+    c.terms = ta.value; persist(c);
+  });
+  $('#btn-to-preview').onclick = () => showScreen('preview');
+  renderLines(c);
+}
+
+function editError(msg) {
+  const box = $('#edit-error');
+  box.textContent = '⚠ ' + msg;
+  box.classList.add('show');
+  clearTimeout(editError._t);
+  editError._t = setTimeout(() => box.classList.remove('show'), 5000);
+}
+
+function renderLines(c) {
+  const wrap = $('#lines-wrap');
+  if (!c.lines.length) {
+    wrap.innerHTML = '<span class="hint">まだ明細がありません。上の料金表をタップすると1行追加されます。</span>';
+  } else {
+    let rows = c.lines.map((ln, i) =>
+      '<tr>' +
+      '<td><input type="text" data-ln="' + i + '" data-f="itemName" value="' + esc(ln.itemName) + '"></td>' +
+      '<td style="width:80px"><input type="text" inputmode="numeric" class="num" data-ln="' + i + '" data-f="qty" value="' + esc(ln.qty) + '"></td>' +
+      '<td style="width:80px"><input type="text" data-ln="' + i + '" data-f="unit" value="' + esc(ln.unit) + '"></td>' +
+      '<td style="width:120px"><input type="text" inputmode="numeric" class="num" data-ln="' + i + '" data-f="unitPrice" value="' + esc(ln.unitPrice) + '"></td>' +
+      '<td class="num" style="text-align:right; width:110px">' + fmt(ln.unitPrice * ln.qty) + '円</td>' +
+      '<td style="width:120px; white-space:nowrap">' +
+      '<button class="btn btn-small" data-up="' + i + '" title="上へ">↑</button> ' +
+      '<button class="btn btn-small" data-down="' + i + '" title="下へ">↓</button> ' +
+      '<button class="btn btn-small" data-rm="' + i + '" title="削除">✕</button></td>' +
+      '</tr>').join('');
+    wrap.innerHTML = '<table class="ui-table"><thead><tr><th>品目</th><th>数量</th><th>単位</th><th>単価(円)</th><th>金額</th><th>操作</th></tr></thead><tbody>' + rows + '</tbody></table>';
+  }
+  const t = caseTotals(c);
+  const taxLines = t.taxRows.map(r => '消費税(' + r.rate + '%・' + ROUND_LABEL[t.mode] + '): ' + fmt(r.tax) + '円').join('<br>');
+  $('#totals-view').innerHTML =
+    '税抜合計: ' + fmt(t.net) + '円<br>' + (taxLines || '消費税: 0円') +
+    '<br><span class="grand">税込合計: ' + fmt(t.gross) + '円</span>' +
+    '<br><span class="hint">※消費税は書類1枚につき税率ごとに1回だけ端数処理しています(⑤設定で方式を変更可)</span>';
+
+  wrap.querySelectorAll('input[data-ln]').forEach(inp => {
+    inp.addEventListener('change', e => {
+      const i = Number(inp.dataset.ln), f = inp.dataset.f, v = inp.value;
+      const ln = c.lines[i]; if (!ln) return;
+      if (f === 'qty' || f === 'unitPrice') {
+        if (!isNonNegInt(v)) {
+          editError((f === 'qty' ? '数量' : '単価') + 'は 0以上の整数(半角数字)で入力してください。「' + v + '」は使えません。');
+          renderLines(c); return; // 元の値に戻す
+        }
+        ln[f] = parseInt(v, 10);
+        // 数量0は仕様上OK(無償項目の明示などに使える)だが、うっかりに気づけるよう警告だけ出す(入力は受け付ける)
+        if (f === 'qty' && ln.qty === 0) {
+          editError('数量が0のため金額0円の行になります。不要な行は「✕」で削除できます。');
+        }
+      } else {
+        ln[f] = v;
+      }
+      persist(c); renderLines(c);
+    });
+  });
+  wrap.querySelectorAll('button[data-rm]').forEach(b => b.onclick = () => {
+    c.lines.splice(Number(b.dataset.rm), 1); persist(c); renderLines(c);
+  });
+  wrap.querySelectorAll('button[data-up]').forEach(b => b.onclick = () => {
+    const i = Number(b.dataset.up);
+    if (i > 0) { [c.lines[i - 1], c.lines[i]] = [c.lines[i], c.lines[i - 1]]; persist(c); renderLines(c); }
+  });
+  wrap.querySelectorAll('button[data-down]').forEach(b => b.onclick = () => {
+    const i = Number(b.dataset.down);
+    if (i < c.lines.length - 1) { [c.lines[i + 1], c.lines[i]] = [c.lines[i], c.lines[i + 1]]; persist(c); renderLines(c); }
+  });
+}
+
+/* ================= ③ 書類プレビュー ================= */
+const DOC_LABELS = { quote: '見積書', order: '注文書', accept: '注文請書', contract: '契約書' };
+
+function renderPreview() {
+  const el = $('#screen-preview');
+  const c = currentCase();
+  if (!c) {
+    el.innerHTML = '<h2>書類プレビュー</h2><div class="card">案件が選ばれていません。<button class="btn" id="btn-go-home2">案件一覧へ</button></div>';
+    $('#btn-go-home2').onclick = () => showScreen('home');
+    return;
+  }
+  ensureDocMeta(c, currentDocType);
+  const doc = c.docs[currentDocType];
+
+  let metaHtml = '<div class="field-row">' +
+    '<div><label>' + DOC_LABELS[currentDocType] + '番号(手直しできます)</label>' +
+    '<input type="text" id="m-number" value="' + esc(doc.number) + '">' +
+    '<span class="hint">番号の西暦は自動では変わりません。発行日を別の年に直した場合は、番号の西暦も手直ししてください</span></div>';
+  if (currentDocType === 'quote') {
+    metaHtml += '<div><label>発行日</label><input type="date" id="m-issue" value="' + esc(doc.issueDate) + '"></div>' +
+      '<div><label>有効期限(既定: 発行日の1ヶ月後)</label><input type="date" id="m-expiry" value="' + esc(doc.expiry) + '"></div>';
+  } else if (currentDocType === 'accept' || currentDocType === 'contract') {
+    metaHtml += '<div><label>' + (currentDocType === 'contract' ? '契約日' : '発行日') + '</label>' +
+      '<input type="date" id="m-issue" value="' + esc(doc.issueDate) + '"></div>';
+  } else {
+    metaHtml += '<div><span class="hint">注文日と記名欄は、先方が書き込むため空欄にしてあります。</span></div>';
+  }
+  metaHtml += '</div>';
+
+  let notices = '';
+  if (currentDocType === 'contract') {
+    notices += '<div class="notice-box"><strong>【必ずお読みください】</strong> このひな形は一般的な参考例です。' +
+      '正式に使う前に内容をご自身で確認し、必要に応じて専門家(弁護士など)にご相談ください。文面は「⑤設定」で編集できます。</div>';
+    notices += '<div class="notice-box"><strong>(未確認・任意)損害賠償上限条項</strong> ' +
+      '※上記の「必ずお読みください」の注記のとおり、法律面の専門家確認がまだ済んでいないため、下記の条文案は本文には含めていません。' +
+      '使う場合はこの文面を専門家確認後、上の契約書ひな形にご自身で追記してください。文面は「⑤設定」で編集できます。' +
+      '<div class="doc-contract-body" style="margin-top:6px">' + nl2br(state.settings.liabilityCapClause.text) + '</div></div>';
+    notices += '<div class="notice-box"><strong>(未確認・任意)データ消失・誤送信の免責条項</strong> ' +
+      '※同じく法律面の専門家確認がまだ済んでいないため、下記の条文案は本文には含めていません。' +
+      '使う場合はこの文面を専門家確認後、上の契約書ひな形にご自身で追記してください。文面は「⑤設定」で編集できます。' +
+      '<div class="doc-contract-body" style="margin-top:6px">' + nl2br(state.settings.dataLossClause.text) + '</div></div>';
+  }
+  if (currentDocType === 'contract' || currentDocType === 'accept') {
+    notices += '<div class="notice-box">紙に印刷して取り交わす場合、収入印紙(税金の印紙)が必要になることがあります。' +
+      'PDFのままメール等でやり取りする場合は不要というのが一般的な取り扱いです。紙にする場合は税務署にご確認ください。</div>';
+  }
+
+  el.innerHTML =
+    '<h2>書類プレビュー ― ' + esc(c.title || '(件名未入力)') + '</h2>' +
+    '<div class="doc-tabs" id="doc-tabs">' +
+    Object.keys(DOC_LABELS).map(t =>
+      '<button data-doc="' + t + '" aria-current="' + (t === currentDocType ? 'true' : 'false') + '">' + DOC_LABELS[t] + '</button>').join('') +
+    '</div>' +
+    '<div class="card">' + metaHtml + '</div>' + notices +
+    '<p><button class="btn btn-primary" id="btn-print">🖨 印刷・PDF保存</button> ' +
+    '<button class="btn" id="btn-back-edit">◀ 編集にもどる</button>' +
+    '<span class="hint">(印刷画面で「PDFとして保存」を選ぶとPDFになります)</span></p>' +
+    '<div id="print-area">' + buildDoc(c, currentDocType) + '</div>';
+
+  $('#doc-tabs').addEventListener('click', e => {
+    const b = e.target.closest('button[data-doc]'); if (!b) return;
+    currentDocType = b.dataset.doc; renderPreview();
+  });
+  $('#m-number').addEventListener('change', e => { doc.number = e.target.value; persist(c); refreshSheet(c); });
+  const mi = $('#m-issue');
+  if (mi) mi.addEventListener('change', e => {
+    const prevIssue = doc.issueDate;                        // 代入の前に旧発行日を取る(順番が大事)
+    const wasAuto = doc.expiry === addMonths(prevIssue, 1); // 期限=旧発行日+1ヶ月なら「自動値のまま」
+    doc.issueDate = e.target.value;
+    // 期限が自動値のままのときだけ追随させる。手直し済みならユーザーの決めた期限を尊重して変えない
+    if (currentDocType === 'quote' && doc.issueDate && wasAuto) {
+      doc.expiry = addMonths(doc.issueDate, 1);
+    }
+    persist(c); renderPreview();
+  });
+  const me = $('#m-expiry');
+  if (me) me.addEventListener('change', e => { doc.expiry = e.target.value; persist(c); refreshSheet(c); });
+  $('#btn-print').onclick = () => window.print();
+  $('#btn-back-edit').onclick = () => showScreen('edit');
+}
+function refreshSheet(c) { $('#print-area').innerHTML = buildDoc(c, currentDocType); }
+
+/* ---- 書類の本体(罫線と文字だけで白黒印刷OK) ---- */
+function issuerBlock(withBank) {
+  const s = state.settings.issuer;
+  let lines = [];
+  if (s.shopName) lines.push('<strong>' + esc(s.shopName) + '</strong>');
+  if (s.name) lines.push(esc(s.name));
+  if (s.address) lines.push(esc(s.address));
+  if (s.tel) lines.push('TEL: ' + esc(s.tel));
+  if (s.email) lines.push('Mail: ' + esc(s.email));
+  if (s.invoiceNumber) lines.push('登録番号: ' + esc(s.invoiceNumber)); // 空欄なら印字しない(免税でも使える様式)
+  if (withBank && s.bankInfo) lines.push('お振込先: ' + esc(s.bankInfo));
+  if (!lines.length) lines.push('(⑤設定で自社情報を入力してください)');
+  return '<div class="doc-issuer">' + lines.join('<br>') + '</div>';
+}
+function linesTable(c) {
+  if (!c.lines.length) return '<p class="hint">(明細がありません)</p>';
+  const rows = c.lines.map(ln =>
+    '<tr><td>' + esc(ln.itemName) + '</td>' +
+    '<td class="num">' + fmt(ln.qty) + '</td>' +
+    '<td>' + esc(ln.unit) + '</td>' +
+    '<td class="num">' + fmt(ln.unitPrice) + '</td>' +
+    '<td class="num">' + fmt(ln.unitPrice * ln.qty) + '</td></tr>').join('');
+  return '<table class="doc-table"><thead><tr><th>品目</th><th style="width:9%">数量</th>' +
+    '<th style="width:9%">単位</th><th style="width:16%">単価(円)</th><th style="width:16%">金額(円)</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table>';
+}
+function totalsTable(c) {
+  const t = caseTotals(c);
+  const taxRows = t.taxRows.map(r =>
+    '<tr><td>消費税(' + r.rate + '%・' + ROUND_LABEL[t.mode] + ')</td><td class="num">' + fmt(r.tax) + '円</td></tr>').join('');
+  return '<table class="doc-totals">' +
+    '<tr><td>税抜合計</td><td class="num">' + fmt(t.net) + '円</td></tr>' +
+    (taxRows || '<tr><td>消費税</td><td class="num">0円</td></tr>') +
+    '<tr class="grand"><td>税込合計</td><td class="num">' + fmt(t.gross) + '円</td></tr></table>';
+}
+function clientTo(c) {
+  return '<div class="doc-to">' + esc(c.clientName || '　　　　　　　　') + ' 御中</div>';
+}
+
+function buildDoc(c, type) {
+  const t = caseTotals(c);
+  const doc = c.docs[type];
+  const s = state.settings.issuer;
+  const myName = s.shopName || s.name || '(自社名未設定)';
+
+  if (type === 'quote') {
+    return '<h1 class="doc-title">御見積書</h1>' +
+      '<div class="doc-head">' + clientTo(c) +
+      '<div class="doc-meta">見積番号: ' + esc(doc.number) + '<br>発行日: ' + esc(fmtDate(doc.issueDate)) +
+      '<br>有効期限: ' + esc(fmtDate(doc.expiry)) + '</div></div>' +
+      '<p class="doc-lead">下記のとおり、お見積り申し上げます。</p>' +
+      '<p class="doc-subject">件名: ' + esc(c.title || '') + '</p>' +
+      '<div class="doc-amount-box">御見積金額(税込): ' + fmt(t.gross) + '円</div>' +
+      linesTable(c) + totalsTable(c) +
+      (c.terms ? '<div class="doc-box"><h4>取引条件</h4>' + nl2br(c.terms) + '</div>' : '') +
+      (c.note ? '<div class="doc-box"><h4>備考</h4>' + nl2br(c.note) + '</div>' : '') +
+      issuerBlock(true);
+  }
+
+  if (type === 'order') {
+    const myTo = '<div class="doc-to">' + esc(myName) + ' 御中</div>';
+    return '<h1 class="doc-title">注文書</h1>' +
+      '<div class="doc-head">' + myTo +
+      '<div class="doc-meta">注文書番号: ' + esc(doc.number) + '<br>注文日: 　　　　年　　月　　日</div></div>' +
+      '<p class="doc-lead">貴社お見積書(見積番号: ' + esc(c.docs.quote.number || '　　　　') + ')に基づき、下記のとおり注文します。</p>' +
+      '<p class="doc-subject">件名: ' + esc(c.title || '') + '</p>' +
+      '<div class="doc-amount-box">注文金額(税込): ' + fmt(t.gross) + '円</div>' +
+      linesTable(c) + totalsTable(c) +
+      '<div class="doc-sign"><strong>注文者(ご記入ください)</strong>' +
+      '<div>住所: <div class="line"></div></div>' +
+      '<div>会社名: <div class="line"></div></div>' +
+      '<div>氏名: <div class="line" style="width:70%; display:inline-block; vertical-align:bottom;"></div>　印</div>' +
+      '</div>' +
+      '<p class="doc-footnote">※この注文書は ' + esc(myName) + ' が様式をご用意したものです。ご記入のうえご返送ください。</p>';
+  }
+
+  if (type === 'accept') {
+    return '<h1 class="doc-title">注文請書</h1>' +
+      '<div class="doc-head">' + clientTo(c) +
+      '<div class="doc-meta">請書番号: ' + esc(doc.number) + '<br>発行日: ' + esc(fmtDate(doc.issueDate)) + '</div></div>' +
+      '<p class="doc-lead">ご注文いただいた下記の内容を、たしかにお請けいたします。</p>' +
+      '<p class="doc-subject">件名: ' + esc(c.title || '') +
+      (c.docs.quote.number ? '(見積番号: ' + esc(c.docs.quote.number) + ')' : '') + '</p>' +
+      '<div class="doc-amount-box">御請負金額(税込): ' + fmt(t.gross) + '円</div>' +
+      linesTable(c) + totalsTable(c) + issuerBlock(false);
+  }
+
+  /* 契約書: ひな形にデータを差し込む「清書」だけを行う(条文は生成しない) */
+  const filled = state.settings.contractTemplate
+    .split('{{発注者}}').join(c.clientName || '　　　　　　')
+    .split('{{受注者}}').join(myName)
+    .split('{{件名}}').join(c.title || '　　　　　　')
+    .split('{{税込金額}}').join(fmt(t.gross) + '円')
+    .split('{{見積番号}}').join(c.docs.quote.number || '　　　　')
+    .split('{{契約日}}').join(fmtDate(doc.issueDate) || '　　　　年　　月　　日')
+    .split('{{乙住所}}').join(s.address || '');
+  return '<div class="doc-meta" style="text-align:right">契約書番号: ' + esc(doc.number) + '</div>' +
+    '<div class="doc-contract-body">' + esc(filled) + '</div>';
+}
+
+/* ================= ④ 料金表 ================= */
+function renderItems() {
+  const el = $('#screen-items');
+  const items = state.items.slice().sort((a, b) => a.sort - b.sort);
+  let rows = items.map((it, i) =>
+    '<tr>' +
+    '<td><input type="text" data-it="' + esc(it.id) + '" data-f="name" value="' + esc(it.name) + '"></td>' +
+    '<td style="width:90px"><input type="text" data-it="' + esc(it.id) + '" data-f="unit" value="' + esc(it.unit) + '"></td>' +
+    '<td style="width:130px"><input type="text" inputmode="numeric" class="num" data-it="' + esc(it.id) + '" data-f="unitPrice" value="' + esc(it.unitPrice) + '"></td>' +
+    '<td style="width:130px; white-space:nowrap">' +
+    '<button class="btn btn-small" data-iup="' + i + '">↑</button> ' +
+    '<button class="btn btn-small" data-idown="' + i + '">↓</button> ' +
+    '<button class="btn btn-small" data-irm="' + esc(it.id) + '">✕</button></td>' +
+    '</tr>').join('');
+  el.innerHTML =
+    '<h2>料金表(品目マスタ)</h2>' +
+    '<div class="notice-box">最初に入っているのは<strong>仮の品目と仮の単価</strong>です。ご自身の料金に直してお使いください。' +
+    '単価は<strong>税抜・整数の円</strong>で入力します(税率は10%固定)。</div>' +
+    '<div class="error-box" id="items-error"></div>' +
+    '<div class="card"><h3>品目を追加</h3><div class="field-row">' +
+    '<div><label>品目名</label><input type="text" id="ni-name" placeholder="例: バナー制作"></div>' +
+    '<div><label>単位</label><input type="text" id="ni-unit" placeholder="例: 式 / ページ / 月"></div>' +
+    '<div><label>単価(税抜・円)</label><input type="text" inputmode="numeric" id="ni-price" placeholder="例: 10000"></div>' +
+    '</div><p><button class="btn btn-primary" id="btn-add-item">+ 追加する</button></p></div>' +
+    '<div class="card table-scroll"><table class="ui-table"><thead>' +
+    '<tr><th>品目名</th><th>単位</th><th>単価(税抜・円)</th><th>操作</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+
+  function itemsError(msg) {
+    const box = $('#items-error');
+    box.textContent = '⚠ ' + msg; box.classList.add('show');
+    clearTimeout(itemsError._t); itemsError._t = setTimeout(() => box.classList.remove('show'), 5000);
+  }
+  $('#btn-add-item').onclick = () => {
+    const name = $('#ni-name').value.trim(), unit = $('#ni-unit').value.trim() || '式', price = $('#ni-price').value.trim();
+    if (!name) { itemsError('品目名を入力してください。'); return; }
+    if (!isNonNegInt(price)) { itemsError('単価は 0以上の整数(半角数字)で入力してください。'); return; }
+    const maxSort = state.items.reduce((m, x) => Math.max(m, x.sort), 0);
+    state.items.push({ id: uid('it'), name: name, unit: unit, unitPrice: parseInt(price, 10), taxRate: 10, sort: maxSort + 1 });
+    persist(); renderItems();
+  };
+  el.querySelectorAll('input[data-it]').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const it = state.items.find(x => x.id === inp.dataset.it); if (!it) return;
+      const f = inp.dataset.f, v = inp.value;
+      if (f === 'unitPrice') {
+        if (!isNonNegInt(v)) { itemsError('単価は 0以上の整数(半角数字)で入力してください。「' + v + '」は使えません。'); renderItems(); return; }
+        it.unitPrice = parseInt(v, 10);
+      } else { it[f] = v; }
+      persist(); renderItems();
+    });
+  });
+  el.querySelectorAll('button[data-irm]').forEach(b => b.onclick = () => {
+    const it = state.items.find(x => x.id === b.dataset.irm); if (!it) return;
+    if (!confirm('品目「' + it.name + '」を料金表から削除します。よろしいですか?(作成済みの見積の明細は変わりません)')) return;
+    state.items = state.items.filter(x => x.id !== it.id); persist(); renderItems();
+  });
+  el.querySelectorAll('button[data-iup]').forEach(b => b.onclick = () => {
+    const i = Number(b.dataset.iup);
+    if (i > 0) { const a = items[i - 1].sort; items[i - 1].sort = items[i].sort; items[i].sort = a; persist(); renderItems(); }
+  });
+  el.querySelectorAll('button[data-idown]').forEach(b => b.onclick = () => {
+    const i = Number(b.dataset.idown);
+    if (i < items.length - 1) { const a = items[i + 1].sort; items[i + 1].sort = items[i].sort; items[i].sort = a; persist(); renderItems(); }
+  });
+}
+
+/* ================= ⑤ 設定 ================= */
+function renderSettings() {
+  const el = $('#screen-settings');
+  const s = state.settings;
+  el.innerHTML =
+    '<h2>設定</h2>' +
+    '<div class="card"><h3>自社情報(書類の発行者欄に載ります)</h3><div class="field-row">' +
+    '<div><label>屋号・会社名(あれば)</label><input type="text" data-issuer="shopName" value="' + esc(s.issuer.shopName) + '"></div>' +
+    '<div><label>氏名</label><input type="text" data-issuer="name" value="' + esc(s.issuer.name) + '"></div>' +
+    '<div><label>住所</label><input type="text" data-issuer="address" value="' + esc(s.issuer.address) + '"></div>' +
+    '<div><label>電話番号</label><input type="text" data-issuer="tel" value="' + esc(s.issuer.tel) + '"></div>' +
+    '<div><label>メール</label><input type="text" data-issuer="email" value="' + esc(s.issuer.email) + '"></div>' +
+    '<div><label>インボイス登録番号(T+13桁。<strong>空欄でもOK</strong>。空欄なら書類に印字されません)</label>' +
+    '<input type="text" data-issuer="invoiceNumber" value="' + esc(s.issuer.invoiceNumber) + '" placeholder="例: T1234567890123">' +
+    '<span class="hint">正しい番号は国税庁の「適格請求書発行事業者公表サイト」で検索して確認できます</span></div>' +
+    '<div><label>振込先口座(見積書に載ります)</label><input type="text" data-issuer="bankInfo" value="' + esc(s.issuer.bankInfo) + '" placeholder="例: ○○銀行 ○○支店 普通 1234567 名義"></div>' +
+    '</div></div>' +
+    '<div class="card"><h3>消費税の端数処理(書類1枚につき税率ごとに1回)</h3>' +
+    ['floor', 'round', 'ceil'].map(m =>
+      '<label style="display:inline-block; margin-right:16px; font-weight:normal">' +
+      '<input type="radio" name="rounding" value="' + m + '"' + (s.tax.rounding === m ? ' checked' : '') + '> ' +
+      ROUND_LABEL[m] + (m === 'floor' ? '(おすすめ・実務で最多)' : '') + '</label>').join('') +
+    '</div>' +
+    '<div class="card"><h3>取引条件の定型文(「②案件の編集」の挿入ボタンの中身)</h3>' +
+    '<p class="hint">ここを直しても、すでに案件に挿入した文面は変わりません(以後の挿入から反映)。着手金の割合もここで変えられます。</p>' +
+    Object.keys(TERM_LABELS).map(k =>
+      '<label>' + TERM_LABELS[k] + '</label><textarea rows="2" data-term-key="' + k + '">' + esc(s.terms[k]) + '</textarea>').join('') +
+    '</div>' +
+    '<div class="card"><h3>契約書ひな形</h3>' +
+    '<div class="notice-box"><strong>【必ずお読みください】</strong> このひな形は一般的な参考例です。正式に使う前に内容をご自身で確認し、' +
+    '必要に応じて専門家(弁護士など)にご相談ください。</div>' +
+    '<p class="hint">差し込み場所: {{発注者}} {{受注者}} {{件名}} {{税込金額}} {{見積番号}} {{契約日}} {{乙住所}} が案件のデータに置き換わります。</p>' +
+    '<textarea id="set-contract" rows="16">' + esc(s.contractTemplate) + '</textarea>' +
+    '<p><button class="btn btn-small" id="btn-reset-contract">ひな形を初期状態に戻す…</button></p></div>' +
+    '<div class="card"><h3>(未確認・任意)損害賠償上限条項</h3>' +
+    '<div class="notice-box">法律面の専門家確認がまだ済んでいないため、この条文は契約書ひな形の本文には自動で入りません(ON/OFFの切替もありません)。' +
+    '「③書類プレビュー」の契約書タブに別枠の参考条文として表示されます。使う場合は専門家確認後、ご自身の判断で上の「契約書ひな形」に手で追記してください。</div>' +
+    '<textarea id="set-liability" rows="4">' + esc(s.liabilityCapClause.text) + '</textarea>' +
+    '<p><button class="btn btn-small" id="btn-reset-liability">初期の条文案に戻す…</button></p></div>' +
+    '<div class="card"><h3>(未確認・任意)データ消失・誤送信の免責条項</h3>' +
+    '<div class="notice-box">こちらも法律面の専門家確認がまだ済んでいないため、契約書ひな形の本文には自動で入りません(ON/OFFの切替もありません)。' +
+    '「③書類プレビュー」の契約書タブに別枠の参考条文として表示されます。使う場合は専門家確認後、ご自身の判断で上の「契約書ひな形」に手で追記してください。' +
+    'トリガーの基準日は既存の検収条項(納品後7日)と同じにしています。</div>' +
+    '<textarea id="set-dataloss" rows="4">' + esc(s.dataLossClause.text) + '</textarea>' +
+    '<p><button class="btn btn-small" id="btn-reset-dataloss">初期の条文案に戻す…</button></p></div>' +
+    '<div class="card"><h3>バックアップ</h3>' +
+    '<p class="hint">保存先(ブラウザ内)は、ブラウザの履歴・サイトデータ削除で消えることがあります。' +
+    '<strong>大事な書類は印刷(PDF保存)+ときどきJSON書き出し</strong>をおすすめします。</p>' +
+    '<p><button class="btn" id="btn-export">JSONを書き出す(ダウンロード)</button> ' +
+    '<label class="btn" style="display:inline-block">JSONを読み込む(復元)<input type="file" id="file-import" accept=".json,application/json" style="display:none"></label></p>' +
+    '</div>';
+
+  el.querySelectorAll('input[data-issuer]').forEach(inp =>
+    inp.addEventListener('change', () => {
+      let v = inp.value.trim();
+      if (inp.dataset.issuer === 'invoiceNumber') {
+        // 空欄はOK(免税事業者のまま使える仕様)。入力ゆれを整形し、T+13桁に合わなければ警告のみ(保存は許す)
+        const typed = v;
+        v = normalizeInvoiceNo(inp.value);
+        inp.value = v; // 整形後の値を画面にも反映(勝手に変わったと感じさせないため下の通知も出す)
+        if (v && !/^T\d{13}$/.test(v)) {
+          alertBox('登録番号は通常「T+数字13桁」です(例: T1234567890123)。お確かめください(入力はこのまま保存されています)。');
+        } else if (v && v !== typed) {
+          alertBox('登録番号を「' + v + '」に整形して保存しました。');
+        }
+      }
+      s.issuer[inp.dataset.issuer] = v;
+      persist();
+    }));
+  el.querySelectorAll('input[name="rounding"]').forEach(r =>
+    r.addEventListener('change', () => { s.tax.rounding = r.value; persist(); }));
+  el.querySelectorAll('textarea[data-term-key]').forEach(ta =>
+    ta.addEventListener('change', () => { s.terms[ta.dataset.termKey] = ta.value; persist(); }));
+  $('#set-contract').addEventListener('change', e => { s.contractTemplate = e.target.value; persist(); });
+  $('#btn-reset-contract').onclick = () => {
+    if (!confirm('契約書ひな形を初期状態に戻します。編集した内容は消えます。よろしいですか?')) return;
+    s.contractTemplate = DEFAULT_CONTRACT; persist(); renderSettings();
+  };
+  $('#set-liability').addEventListener('change', e => { s.liabilityCapClause.text = e.target.value; persist(); });
+  $('#btn-reset-liability').onclick = () => {
+    if (!confirm('損害賠償上限条項の文面を初期状態に戻します。編集した内容は消えます。よろしいですか?')) return;
+    s.liabilityCapClause.text = DEFAULT_LIABILITY_CAP_CLAUSE; persist(); renderSettings();
+  };
+  $('#set-dataloss').addEventListener('change', e => { s.dataLossClause.text = e.target.value; persist(); });
+  $('#btn-reset-dataloss').onclick = () => {
+    if (!confirm('データ消失・誤送信の免責条項の文面を初期状態に戻します。編集した内容は消えます。よろしいですか?')) return;
+    s.dataLossClause.text = DEFAULT_DATA_LOSS_CLAUSE; persist(); renderSettings();
+  };
+  $('#btn-export').onclick = () => {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '受注書類バックアップ-' + todayStr() + '.json';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  };
+  $('#file-import').addEventListener('change', e => {
+    const f = e.target.files[0]; if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const obj = JSON.parse(reader.result);
+        if (!obj || obj.version !== 1 || !obj.settings || !Array.isArray(obj.items) || !Array.isArray(obj.cases)) {
+          alertBox('このファイルは本アプリのバックアップ形式ではありません。'); return;
+        }
+        if (!confirm('今のデータを、読み込んだ内容で【上書き】します。よろしいですか?')) return;
+        normalizeIds(obj); // 読み込んだJSONの id を検査し、危険な形は再発行(XSS対策)
+        state = obj;
+        currentCaseId = state.cases.length ? state.cases[0].id : null;
+        persist(); showScreen('home');
+        alertBox('バックアップを読み込みました。');
+      } catch (err) { alertBox('読み込みに失敗しました: ' + err.message); }
+      e.target.value = '';
+    };
+    reader.readAsText(f);
+  });
+}
+
+/* ================= 起動 ================= */
+showScreen('home');
+</script>
+</body>
+</html>
