@@ -91,6 +91,15 @@
   .doc-sign .line { border-bottom: 1px solid #111; min-height: 26px; margin: 10px 0; }
   .doc-contract-body { font-size: 13px; white-space: pre-wrap; }
   .doc-footnote { font-size: 11px; margin-top: 12px; }
+  /* 送付状・委任状の「記」書き */
+  .doc-ki { text-align: center; font-weight: bold; margin: 16px 0 8px; font-size: 14px; }
+  .doc-ki-list { max-width: 75%; margin: 0 auto; font-size: 13px; }
+  .doc-ki-list div { border-bottom: 1px dotted #555; padding: 4px 2px; }
+  .doc-ijo { text-align: right; font-size: 13px; margin-top: 12px; }
+  /* 議事録の情報表 */
+  table.doc-info { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 13px; }
+  table.doc-info th, table.doc-info td { border: 1px solid #111; padding: 5px 8px; text-align: left; }
+  table.doc-info th { background: #eee; width: 90px; white-space: nowrap; font-weight: bold; }
 
   @media (max-width: 600px) {
     #print-area { padding: 16px; }
@@ -178,6 +187,68 @@ const DEFAULT_CONTRACT = [
 '記名:　　　　　　　　　　　　　　　印'
 ].join('\n');
 
+/* 契約書ひな形の追加プリセット(設定画面のボタンで contractTemplate に読み込む)。
+   既定のWEB制作請負と同じく {{発注者}} などの差し込み場所が使える */
+const PRESET_CONTRACT_GYOMU = [
+'業務委託契約書',
+'',
+'発注者 {{発注者}}(以下「甲」といいます)と、受注者 {{受注者}}(以下「乙」といいます)は、次のとおり業務委託契約を結びます。',
+'',
+'第1条(業務内容) 甲は乙に「{{件名}}」の業務を委託し、乙はこれを引き受けます。くわしい内容は、見積書({{見積番号}})のとおりとします。',
+'第2条(委託料と支払) 委託料は {{税込金額}}(消費税込み)とします。支払いの方法と時期は、見積書の取引条件のとおりとします。振込手数料は甲の負担とします。',
+'第3条(業務の進め方) 乙は、注意深く誠実に業務を行います。甲は、業務に必要な資料や情報の提供に協力します。',
+'第4条(再委託) 乙は、業務の一部を第三者に任せる場合、責任をもって管理します。',
+'第5条(秘密保持) 甲と乙は、この契約で知った相手の秘密を、相手の許可なく他人に漏らしません。この義務は契約が終わったあとも3年間続きます。',
+'第6条(成果物の権利) 業務の成果物の著作権(著作権法第27条・第28条の権利を含みます)は、委託料の支払いが完了した時に甲へ移ります。乙は著作者人格権を行使しません。ただし、乙がもともと持っていた権利は乙に残ります。',
+'第7条(契約期間) この契約の期間は、契約日から1年間とします。期間が終わる1ヶ月前までにどちらからも申し出がなければ、同じ条件でさらに1年間続き、以後も同様とします。',
+'第8条(解除) 相手がこの契約に違反し、期限を決めて直すよう求めても直らないときは、この契約を解除できます。',
+'第9条(中止時の精算) この契約が途中で終了した場合、甲は、それまでに乙が行った作業分の委託料を支払います。',
+'第10条(協議・管轄) 決めていないことや争いが起きたときは、まず話し合いで解決します。裁判になる場合は、乙の所在地を管轄する裁判所を第一審の裁判所とします。',
+'',
+'この契約の成立の証として本書を2通(電子でやり取りする場合は電磁的記録)作成し、甲乙がそれぞれ保管します。',
+'',
+'契約日: {{契約日}}',
+'',
+'甲(発注者): {{発注者}}',
+'住所:',
+'記名:　　　　　　　　　　　　　　　印',
+'',
+'乙(受注者): {{受注者}}',
+'住所: {{乙住所}}',
+'記名:　　　　　　　　　　　　　　　印'
+].join('\n');
+
+const PRESET_CONTRACT_NDA = [
+'秘密保持契約書',
+'',
+'{{発注者}}(以下「甲」といいます)と {{受注者}}(以下「乙」といいます)は、「{{件名}}」に関する検討・取引(以下「本目的」といいます)のためにやり取りする秘密情報の取り扱いについて、次のとおり契約を結びます。',
+'',
+'第1条(秘密情報) 「秘密情報」とは、本目的のために相手から受け取った、仕事上・技術上その他の一切の情報をいいます。ただし、次のものは含みません。',
+'(1) 受け取った時点で、すでに世の中に知られていた情報、または受け取った側のせいではなく後から知られた情報',
+'(2) 受け取った時点で、すでに自分が持っていた情報',
+'(3) 正当な権限を持つ第三者から、秘密にする義務を負わずに適法に手に入れた情報',
+'(4) 相手の情報によらずに、自分で独自に作り出した情報',
+'第2条(秘密保持) 甲と乙は、秘密情報を注意深く管理し、相手の書面による許可なく他人に見せたり漏らしたりしません。',
+'第3条(目的外使用の禁止) 甲と乙は、秘密情報を本目的以外に使いません。',
+'第4条(複製の制限) 甲と乙は、本目的に必要な範囲を超えて秘密情報をコピーしません。',
+'第5条(返還・廃棄) 相手から求められたとき、またはこの契約が終わったときは、秘密情報とそのコピーをすみやかに返すか廃棄します。',
+'第6条(有効期間) この契約の期間は、契約日から1年間とします。ただし、第2条と第3条の義務は、契約が終わったあとも3年間続きます。',
+'第7条(損害賠償) この契約に違反して相手に損害を与えたときは、その損害を賠償します。',
+'第8条(協議) 決めていないことや争いが起きたときは、甲乙で誠意をもって話し合って解決します。',
+'',
+'この契約の成立の証として本書を2通(電子でやり取りする場合は電磁的記録)作成し、甲乙がそれぞれ保管します。',
+'',
+'契約日: {{契約日}}',
+'',
+'甲: {{発注者}}',
+'住所:',
+'記名:　　　　　　　　　　　　　　　印',
+'',
+'乙: {{受注者}}',
+'住所: {{乙住所}}',
+'記名:　　　　　　　　　　　　　　　印'
+].join('\n');
+
 /* 損害賠償上限条項・データ消失/誤送信の免責条項:
    専門家確認が済むまでは契約書ひな形の本文には入れない(案A確定)。
    プレビューと設定画面に「別枠の条文案」として表示するだけの位置づけ */
@@ -205,7 +276,8 @@ function defaultState() {
       contractTemplate: DEFAULT_CONTRACT,
       liabilityCapClause: { text: DEFAULT_LIABILITY_CAP_CLAUSE },
       dataLossClause: { text: DEFAULT_DATA_LOSS_CLAUSE },
-      numbering: { quote: {}, order: {}, accept: {}, contract: {}, delivery: {}, invoice: {}, receipt: {} }
+      numbering: { quote: {}, order: {}, accept: {}, contract: {}, delivery: {}, inspection: {},
+                   invoice: {}, receipt: {}, cover: {}, poa: {}, minutes: {} }
     },
     items: SAMPLE_ITEMS.map(x => Object.assign({}, x)),
     cases: []
@@ -221,13 +293,17 @@ let currentScreen = 'home';
    (newCase・複製・loadState の穴埋めがすべてここを参照する) */
 function defaultDocs() {
   return {
-    quote:    { number: '', issueDate: '', expiry: '' },
-    order:    { number: '', issueDate: '' },
-    accept:   { number: '', issueDate: '' },
-    contract: { number: '', issueDate: '' },
-    delivery: { number: '', issueDate: '' },
-    invoice:  { number: '', issueDate: '', due: '', withholding: false },
-    receipt:  { number: '', issueDate: '', proviso: '' }
+    quote:      { number: '', issueDate: '', expiry: '' },
+    order:      { number: '', issueDate: '' },
+    accept:     { number: '', issueDate: '' },
+    contract:   { number: '', issueDate: '' },
+    delivery:   { number: '', issueDate: '' },
+    inspection: { number: '', issueDate: '' },
+    invoice:    { number: '', issueDate: '', due: '', withholding: false },
+    receipt:    { number: '', issueDate: '', proviso: '' },
+    cover:      { number: '', issueDate: '', items: '' },
+    poa:        { number: '', issueDate: '', agentName: '', agentAddress: '', matters: '' },
+    minutes:    { number: '', issueDate: '', time: '', place: '', attendees: '', body: '' }
   };
 }
 
@@ -386,10 +462,22 @@ function ensureDocMeta(c, type) {
   } else if (type === 'invoice') {
     if (!doc.issueDate) { doc.issueDate = todayStr(); changed = true; }
     if (!doc.due) { doc.due = endOfNextMonth(doc.issueDate); changed = true; }
-  } else if (type === 'accept' || type === 'contract' || type === 'delivery' || type === 'receipt') {
+  } else if (type === 'accept' || type === 'contract' || type === 'delivery' || type === 'receipt' ||
+             type === 'cover' || type === 'poa' || type === 'minutes') {
     if (!doc.issueDate) { doc.issueDate = todayStr(); changed = true; }
   }
-  // 注文書の注文日は先方が書くため、わざと空欄のまま
+  // 送付状の同封書類は、番号が付いている(=一度でも開いた)書類から自動で下書きする(手直し可)
+  if (type === 'cover' && !doc.items) {
+    const lines = [];
+    [['quote', '御見積書'], ['order', '注文書'], ['accept', '注文請書'], ['contract', '契約書'],
+     ['delivery', '納品書'], ['inspection', '検収書'], ['invoice', '御請求書'], ['receipt', '領収書']]
+      .forEach(pair => {
+        const d2 = c.docs[pair[0]];
+        if (d2 && d2.number) lines.push(pair[1] + '(' + d2.number + ') 1通');
+      });
+    if (lines.length) { doc.items = lines.join('\n'); changed = true; }
+  }
+  // 注文書の注文日・検収書の検収日は先方が書くため、わざと空欄のまま
   if (changed) persist(c);
 }
 
@@ -598,9 +686,11 @@ function renderLines(c) {
 }
 
 /* ================= ③ 書類プレビュー ================= */
-/* 受注の流れの順に並べる: 見積 → 注文 → 請書 → 契約 → 納品 → 請求 → 領収 */
+/* 受注の流れの順に並べる: 見積 → 注文 → 請書 → 契約 → 納品 → 検収 → 請求 → 領収。
+   そのあとに事務まわりの書類(送付状・委任状・議事録)を置く */
 const DOC_LABELS = { quote: '見積書', order: '注文書', accept: '注文請書', contract: '契約書',
-                     delivery: '納品書', invoice: '請求書', receipt: '領収書' };
+                     delivery: '納品書', inspection: '検収書', invoice: '請求書', receipt: '領収書',
+                     cover: '送付状', poa: '委任状', minutes: '議事録' };
 
 function renderPreview() {
   const el = $('#screen-preview');
@@ -627,11 +717,30 @@ function renderPreview() {
     metaHtml += '<div><label>発行日</label><input type="date" id="m-issue" value="' + esc(doc.issueDate) + '"></div>' +
       '<div><label>但し書き(空欄なら件名から自動で入ります)</label>' +
       '<input type="text" id="m-proviso" value="' + esc(doc.proviso) + '" placeholder="例: WEBサイト制作代金として"></div>';
+  } else if (currentDocType === 'cover') {
+    metaHtml += '<div><label>発行日</label><input type="date" id="m-issue" value="' + esc(doc.issueDate) + '"></div>' +
+      '<div style="flex:1 1 100%"><label>同封書類(1行に1つ。番号が付いた書類から自動で下書きされます)</label>' +
+      '<textarea rows="4" data-mf="items" placeholder="例:&#10;御請求書(2026-001) 1通&#10;返信用封筒 1通">' + esc(doc.items) + '</textarea></div>';
+  } else if (currentDocType === 'poa') {
+    metaHtml += '<div><label>日付</label><input type="date" id="m-issue" value="' + esc(doc.issueDate) + '"></div>' +
+      '<div><label>受任者(代理人)の氏名</label><input type="text" data-mf="agentName" value="' + esc(doc.agentName) + '" placeholder="例: 山田 花子"></div>' +
+      '<div><label>受任者(代理人)の住所</label><input type="text" data-mf="agentAddress" value="' + esc(doc.agentAddress) + '" placeholder="例: 東京都○○区…"></div>' +
+      '<div style="flex:1 1 100%"><label>委任する事項(1行に1つ)</label>' +
+      '<textarea rows="3" data-mf="matters" placeholder="例:&#10;○○に関する契約の締結に関する一切の件&#10;上記に付随する一切の件">' + esc(doc.matters) + '</textarea></div>';
+  } else if (currentDocType === 'minutes') {
+    metaHtml += '<div><label>開催日</label><input type="date" id="m-issue" value="' + esc(doc.issueDate) + '"></div>' +
+      '<div><label>時間</label><input type="text" data-mf="time" value="' + esc(doc.time) + '" placeholder="例: 10:00〜11:00"></div>' +
+      '<div><label>場所</label><input type="text" data-mf="place" value="' + esc(doc.place) + '" placeholder="例: 貴社会議室 / オンライン"></div>' +
+      '<div><label>出席者</label><input type="text" data-mf="attendees" value="' + esc(doc.attendees) + '" placeholder="例: ○○様、△△(自社)"></div>' +
+      '<div style="flex:1 1 100%"><label>議題・決定事項</label>' +
+      '<textarea rows="6" data-mf="body" placeholder="例:&#10;1. デザイン案について&#10;・A案で進めることに決定。&#10;・写真素材は○○様よりご提供いただく(今週中)。">' + esc(doc.body) + '</textarea></div>';
   } else if (currentDocType === 'accept' || currentDocType === 'contract' || currentDocType === 'delivery') {
     metaHtml += '<div><label>' + (currentDocType === 'contract' ? '契約日' : (currentDocType === 'delivery' ? '納品日' : '発行日')) + '</label>' +
       '<input type="date" id="m-issue" value="' + esc(doc.issueDate) + '"></div>';
   } else {
-    metaHtml += '<div><span class="hint">注文日と記名欄は、先方が書き込むため空欄にしてあります。</span></div>';
+    metaHtml += '<div><span class="hint">' +
+      (currentDocType === 'inspection' ? '検収日と記名欄は、先方が書き込むため空欄にしてあります。'
+                                       : '注文日と記名欄は、先方が書き込むため空欄にしてあります。') + '</span></div>';
   }
   metaHtml += '</div>';
   if (currentDocType === 'invoice') {
@@ -705,6 +814,9 @@ function renderPreview() {
   if (mp) mp.addEventListener('change', e => { doc.proviso = e.target.value; persist(c); refreshSheet(c); });
   const mw = $('#m-withholding');
   if (mw) mw.addEventListener('change', e => { doc.withholding = e.target.checked; persist(c); refreshSheet(c); });
+  // 送付状・委任状・議事録の入力欄は data-mf="フィールド名" でまとめて書類メタに保存する
+  el.querySelectorAll('[data-mf]').forEach(inp =>
+    inp.addEventListener('change', () => { doc[inp.dataset.mf] = inp.value; persist(c); refreshSheet(c); }));
   $('#btn-print').onclick = () => window.print();
   $('#btn-back-edit').onclick = () => showScreen('edit');
 }
@@ -849,6 +961,77 @@ function buildDoc(c, type) {
       '<p class="doc-footnote">※紙でお渡しする場合、受取金額5万円以上は収入印紙が必要になることがあります(電子・PDFは不要が一般的)。</p>';
   }
 
+  if (type === 'inspection') {
+    // 検収書は発注者(先方)が記入して返す様式。注文書と同じく、宛先は自社・日付と記名は空欄
+    const myTo = '<div class="doc-to">' + esc(myName) + ' 御中</div>';
+    return '<h1 class="doc-title">検収書</h1>' +
+      '<div class="doc-head">' + myTo +
+      '<div class="doc-meta">検収書番号: ' + esc(doc.number) + '<br>検収日: 　　　　年　　月　　日</div></div>' +
+      '<p class="doc-lead">貴社より納品を受けた下記の内容について、検査のうえ受け入れたことを通知します。</p>' +
+      '<p class="doc-subject">件名: ' + esc(c.title || '') +
+      (c.docs.delivery.number ? '(納品書番号: ' + esc(c.docs.delivery.number) + ')' : '') + '</p>' +
+      linesTable(c) + totalsTable(c) +
+      '<div class="doc-sign"><strong>検収者(ご記入ください)</strong>' +
+      '<div>会社名: <div class="line"></div></div>' +
+      '<div>氏名: <div class="line" style="width:70%; display:inline-block; vertical-align:bottom;"></div>　印</div>' +
+      '</div>' +
+      '<p class="doc-footnote">※この検収書は ' + esc(myName) + ' が様式をご用意したものです。ご記入のうえご返送ください。</p>';
+  }
+
+  if (type === 'cover') {
+    const kiLines = String(doc.items || '').split('\n').map(x => x.trim()).filter(Boolean);
+    return '<div class="doc-meta" style="text-align:right">送付状番号: ' + esc(doc.number) +
+      '<br>発行日: ' + esc(fmtDate(doc.issueDate)) + '</div>' +
+      clientTo(c) +
+      issuerBlock(false) +
+      '<h1 class="doc-title" style="letter-spacing:4px; font-size:20px; margin-top:14px">書類送付のご案内</h1>' +
+      '<p class="doc-lead">拝啓　時下ますますご清栄のこととお慶び申し上げます。平素は格別のお引き立てを賜り、厚く御礼申し上げます。<br>' +
+      'さて、下記の書類をお送りいたしますので、ご査収のほどよろしくお願い申し上げます。</p>' +
+      '<div style="text-align:right; font-size:13px">敬具</div>' +
+      '<div class="doc-ki">記</div>' +
+      '<div class="doc-ki-list">' +
+      (kiLines.length ? kiLines.map(x => '<div>' + esc(x) + '</div>').join('')
+                      : '<div>(上の「同封書類」欄に、送る書類を1行ずつ入力してください)</div>') +
+      '</div>' +
+      (c.note ? '<div class="doc-box"><h4>備考</h4>' + nl2br(c.note) + '</div>' : '') +
+      '<div class="doc-ijo">以上</div>';
+  }
+
+  if (type === 'poa') {
+    const matters = String(doc.matters || '').split('\n').map(x => x.trim()).filter(Boolean);
+    return '<h1 class="doc-title">委任状</h1>' +
+      '<div class="doc-meta" style="text-align:right">委任状番号: ' + esc(doc.number) + '</div>' +
+      '<p class="doc-lead">私は、下記の者を代理人と定め、下記の事項に関する一切の権限を委任します。</p>' +
+      '<div class="doc-ki">記</div>' +
+      '<div class="doc-box"><h4>受任者(代理人)</h4>' +
+      (doc.agentAddress ? '住所: ' + esc(doc.agentAddress) + '<br>' : '') +
+      '氏名: ' + esc(doc.agentName || '(上の欄でご入力ください)') + '</div>' +
+      '<div class="doc-box"><h4>委任する事項</h4>' +
+      (matters.length ? matters.map((x, i) => (i + 1) + '. ' + esc(x)).join('<br>')
+                      : '(上の欄で1行に1つずつご入力ください)') + '</div>' +
+      '<div class="doc-ijo">以上</div>' +
+      '<div class="doc-sign" style="margin-top:30px"><strong>委任者</strong>' +
+      '<div style="margin-top:8px">' + esc(fmtDate(doc.issueDate)) + '</div>' +
+      (s.address ? '<div>住所: ' + esc(s.address) + '</div>' : '') +
+      // 委任状の委任者は屋号ではなく本人の氏名で出す(氏名が未入力なら屋号で代用)
+      '<div>氏名: ' + esc(s.name || myName) + '　　　　　　　　印</div></div>';
+  }
+
+  if (type === 'minutes') {
+    return '<h1 class="doc-title" style="letter-spacing:6px">議事録</h1>' +
+      '<div class="doc-meta" style="text-align:right">議事録番号: ' + esc(doc.number) + '</div>' +
+      '<table class="doc-info">' +
+      '<tr><th>件名</th><td>' + esc(c.title || '') + ' 打ち合わせ</td></tr>' +
+      '<tr><th>日時</th><td>' + esc(fmtDate(doc.issueDate)) + (doc.time ? '　' + esc(doc.time) : '') + '</td></tr>' +
+      (doc.place ? '<tr><th>場所</th><td>' + esc(doc.place) + '</td></tr>' : '') +
+      (doc.attendees ? '<tr><th>出席者</th><td>' + esc(doc.attendees) + '</td></tr>' : '') +
+      '</table>' +
+      '<div class="doc-box"><h4>議題・決定事項</h4>' +
+      (doc.body ? '<div class="doc-contract-body">' + esc(doc.body) + '</div>'
+                : '<span class="hint">(上の「議題・決定事項」欄にご入力ください)</span>') + '</div>' +
+      '<div class="doc-issuer">作成: ' + esc(myName) + '</div>';
+  }
+
   /* 契約書: ひな形にデータを差し込む「清書」だけを行う(条文は生成しない) */
   const filled = state.settings.contractTemplate
     .split('{{発注者}}').join(c.clientName || '　　　　　　')
@@ -961,7 +1144,10 @@ function renderSettings() {
     '必要に応じて専門家(弁護士など)にご相談ください。</div>' +
     '<p class="hint">差し込み場所: {{発注者}} {{受注者}} {{件名}} {{税込金額}} {{見積番号}} {{契約日}} {{乙住所}} が案件のデータに置き換わります。</p>' +
     '<textarea id="set-contract" rows="16">' + esc(s.contractTemplate) + '</textarea>' +
-    '<p><button class="btn btn-small" id="btn-reset-contract">ひな形を初期状態に戻す…</button></p></div>' +
+    '<p><button class="btn btn-small" id="btn-reset-contract">WEB制作請負のひな形に戻す…</button> ' +
+    '<button class="btn btn-small" id="btn-tpl-gyomu">業務委託契約書のひな形にする…</button> ' +
+    '<button class="btn btn-small" id="btn-tpl-nda">秘密保持契約書のひな形にする…</button></p>' +
+    '<p class="hint">案件の内容に合わせてひな形を切り替えられます(切り替えると今の文面は置き換わります。編集した文面を残したい場合は、先にコピーして控えてください)。</p></div>' +
     '<div class="card"><h3>(未確認・任意)損害賠償上限条項</h3>' +
     '<div class="notice-box">法律面の専門家確認がまだ済んでいないため、この条文は契約書ひな形の本文には自動で入りません(ON/OFFの切替もありません)。' +
     '「③書類プレビュー」の契約書タブに別枠の参考条文として表示されます。使う場合は専門家確認後、ご自身の判断で上の「契約書ひな形」に手で追記してください。</div>' +
@@ -1003,8 +1189,16 @@ function renderSettings() {
     ta.addEventListener('change', () => { s.terms[ta.dataset.termKey] = ta.value; persist(); }));
   $('#set-contract').addEventListener('change', e => { s.contractTemplate = e.target.value; persist(); });
   $('#btn-reset-contract').onclick = () => {
-    if (!confirm('契約書ひな形を初期状態に戻します。編集した内容は消えます。よろしいですか?')) return;
+    if (!confirm('契約書ひな形をWEB制作請負(初期状態)にします。今の文面は消えます。よろしいですか?')) return;
     s.contractTemplate = DEFAULT_CONTRACT; persist(); renderSettings();
+  };
+  $('#btn-tpl-gyomu').onclick = () => {
+    if (!confirm('契約書ひな形を「業務委託契約書」にします。今の文面は消えます。よろしいですか?')) return;
+    s.contractTemplate = PRESET_CONTRACT_GYOMU; persist(); renderSettings();
+  };
+  $('#btn-tpl-nda').onclick = () => {
+    if (!confirm('契約書ひな形を「秘密保持契約書」にします。今の文面は消えます。よろしいですか?')) return;
+    s.contractTemplate = PRESET_CONTRACT_NDA; persist(); renderSettings();
   };
   $('#set-liability').addEventListener('change', e => { s.liabilityCapClause.text = e.target.value; persist(); });
   $('#btn-reset-liability').onclick = () => {
