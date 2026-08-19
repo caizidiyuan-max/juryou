@@ -205,7 +205,7 @@ function defaultState() {
       contractTemplate: DEFAULT_CONTRACT,
       liabilityCapClause: { text: DEFAULT_LIABILITY_CAP_CLAUSE },
       dataLossClause: { text: DEFAULT_DATA_LOSS_CLAUSE },
-      numbering: { quote: {}, order: {}, accept: {}, contract: {} }
+      numbering: { quote: {}, order: {}, accept: {}, contract: {}, delivery: {}, invoice: {}, receipt: {} }
     },
     items: SAMPLE_ITEMS.map(x => Object.assign({}, x)),
     cases: []
@@ -216,6 +216,20 @@ let state = loadState();
 let currentCaseId = state.cases.length ? state.cases[0].id : null;
 let currentDocType = 'quote';
 let currentScreen = 'home';
+
+/* 案件が持つ書類メタの初期形。新しい書類の種類を増やすときはここに足す
+   (newCase・複製・loadState の穴埋めがすべてここを参照する) */
+function defaultDocs() {
+  return {
+    quote:    { number: '', issueDate: '', expiry: '' },
+    order:    { number: '', issueDate: '' },
+    accept:   { number: '', issueDate: '' },
+    contract: { number: '', issueDate: '' },
+    delivery: { number: '', issueDate: '' },
+    invoice:  { number: '', issueDate: '', due: '', withholding: false },
+    receipt:  { number: '', issueDate: '', proviso: '' }
+  };
+}
 
 /* 保存データ由来の id を許可リスト(英数字・-・_ のみ)で検査し、外れたものは再発行する。
    id は画面のHTML属性に埋め込まれるため、改ざんされたJSONを読み込んでも安全な形だけを通す(XSS対策の入口側) */
@@ -241,6 +255,9 @@ function loadState() {
     obj.settings.liabilityCapClause = Object.assign(d.settings.liabilityCapClause, obj.settings.liabilityCapClause || {});
     obj.settings.dataLossClause = Object.assign(d.settings.dataLossClause, obj.settings.dataLossClause || {});
     obj.settings.numbering = Object.assign(d.settings.numbering, obj.settings.numbering || {});
+    // 納品書・請求書・領収書を後から追加したため、古い保存データの案件には docs のキーが無い。
+    // 既存の値は残したまま、足りない書類メタだけを初期形で穴埋めする
+    (obj.cases || []).forEach(c => { c.docs = Object.assign(defaultDocs(), c.docs || {}); });
     normalizeIds(obj);
     return obj;
   } catch (e) {
@@ -282,6 +299,12 @@ function addMonths(iso, m) {
   const day = d.getDate();
   d.setMonth(d.getMonth() + m);
   if (d.getDate() !== day) d.setDate(0); // 例: 1/31 の1ヶ月後は 2月末日
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+/* 請求書の支払期限の既定「発行日の翌月末日」を求める */
+function endOfNextMonth(iso) {
+  const p = iso.split('-').map(Number);
+  const d = new Date(p[0], p[1] - 1 + 2, 0); // 翌々月の0日 = 翌月の末日
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 function fmtDate(iso) {
@@ -360,7 +383,10 @@ function ensureDocMeta(c, type) {
   if (type === 'quote') {
     if (!doc.issueDate) { doc.issueDate = todayStr(); changed = true; }
     if (!doc.expiry) { doc.expiry = addMonths(doc.issueDate, 1); changed = true; }
-  } else if (type === 'accept' || type === 'contract') {
+  } else if (type === 'invoice') {
+    if (!doc.issueDate) { doc.issueDate = todayStr(); changed = true; }
+    if (!doc.due) { doc.due = endOfNextMonth(doc.issueDate); changed = true; }
+  } else if (type === 'accept' || type === 'contract' || type === 'delivery' || type === 'receipt') {
     if (!doc.issueDate) { doc.issueDate = todayStr(); changed = true; }
   }
   // 注文書の注文日は先方が書くため、わざと空欄のまま
@@ -371,10 +397,7 @@ function ensureDocMeta(c, type) {
 function newCase() {
   const c = {
     id: uid('c'), title: '', clientName: '', lines: [], terms: '', note: '',
-    docs: { quote: { number: '', issueDate: '', expiry: '' },
-            order: { number: '', issueDate: '' },
-            accept: { number: '', issueDate: '' },
-            contract: { number: '', issueDate: '' } },
+    docs: defaultDocs(),
     updatedAt: new Date().toISOString()
   };
   state.cases.push(c);
@@ -408,7 +431,7 @@ function renderHome() {
     '<p><button class="btn btn-primary" id="btn-new-case">+ 新しい案件をつくる</button></p>';
   if (!cases.length) {
     html += '<div class="card">まだ案件がありません。「+ 新しい案件をつくる」から始めてください。<br>' +
-            '<span class="hint">流れ: 案件をつくる → 料金表をタップして見積書 → プレビューで印刷(PDF保存)</span></div>';
+            '<span class="hint">流れ: 案件をつくる → 料金表をタップして明細づくり → プレビューで見積書から契約書・納品書・請求書・領収書まで印刷(PDF保存)</span></div>';
   }
   for (const c of cases) {
     const t = caseTotals(c);
@@ -429,8 +452,7 @@ function renderHome() {
     const copy = JSON.parse(JSON.stringify(src));
     copy.id = uid('c');
     copy.title = (src.title || '(件名未入力)') + '(複製)';
-    copy.docs = { quote: { number: '', issueDate: '', expiry: '' }, order: { number: '', issueDate: '' },
-                  accept: { number: '', issueDate: '' }, contract: { number: '', issueDate: '' } };
+    copy.docs = defaultDocs(); // 番号・日付は複製先で新しく採番し直す
     copy.updatedAt = new Date().toISOString();
     state.cases.push(copy); persist(); renderHome();
   });
@@ -576,7 +598,9 @@ function renderLines(c) {
 }
 
 /* ================= ③ 書類プレビュー ================= */
-const DOC_LABELS = { quote: '見積書', order: '注文書', accept: '注文請書', contract: '契約書' };
+/* 受注の流れの順に並べる: 見積 → 注文 → 請書 → 契約 → 納品 → 請求 → 領収 */
+const DOC_LABELS = { quote: '見積書', order: '注文書', accept: '注文請書', contract: '契約書',
+                     delivery: '納品書', invoice: '請求書', receipt: '領収書' };
 
 function renderPreview() {
   const el = $('#screen-preview');
@@ -596,13 +620,25 @@ function renderPreview() {
   if (currentDocType === 'quote') {
     metaHtml += '<div><label>発行日</label><input type="date" id="m-issue" value="' + esc(doc.issueDate) + '"></div>' +
       '<div><label>有効期限(既定: 発行日の1ヶ月後)</label><input type="date" id="m-expiry" value="' + esc(doc.expiry) + '"></div>';
-  } else if (currentDocType === 'accept' || currentDocType === 'contract') {
-    metaHtml += '<div><label>' + (currentDocType === 'contract' ? '契約日' : '発行日') + '</label>' +
+  } else if (currentDocType === 'invoice') {
+    metaHtml += '<div><label>発行日</label><input type="date" id="m-issue" value="' + esc(doc.issueDate) + '"></div>' +
+      '<div><label>お支払期限(既定: 発行日の翌月末日)</label><input type="date" id="m-due" value="' + esc(doc.due) + '"></div>';
+  } else if (currentDocType === 'receipt') {
+    metaHtml += '<div><label>発行日</label><input type="date" id="m-issue" value="' + esc(doc.issueDate) + '"></div>' +
+      '<div><label>但し書き(空欄なら件名から自動で入ります)</label>' +
+      '<input type="text" id="m-proviso" value="' + esc(doc.proviso) + '" placeholder="例: WEBサイト制作代金として"></div>';
+  } else if (currentDocType === 'accept' || currentDocType === 'contract' || currentDocType === 'delivery') {
+    metaHtml += '<div><label>' + (currentDocType === 'contract' ? '契約日' : (currentDocType === 'delivery' ? '納品日' : '発行日')) + '</label>' +
       '<input type="date" id="m-issue" value="' + esc(doc.issueDate) + '"></div>';
   } else {
     metaHtml += '<div><span class="hint">注文日と記名欄は、先方が書き込むため空欄にしてあります。</span></div>';
   }
   metaHtml += '</div>';
+  if (currentDocType === 'invoice') {
+    metaHtml += '<label style="margin-top:10px"><input type="checkbox" id="m-withholding"' + (doc.withholding ? ' checked' : '') + '> ' +
+      '源泉徴収税額(10.21%)を差し引いた請求書にする</label>' +
+      '<span class="hint">相手が会社などで、デザイン料等の報酬から源泉徴収される場合にチェックします。税抜金額に対する10.21%を差し引いて表示します。よくわからない場合はチェック不要です(相手に確認するのが確実です)。</span>';
+  }
 
   let notices = '';
   if (currentDocType === 'contract') {
@@ -620,6 +656,13 @@ function renderPreview() {
   if (currentDocType === 'contract' || currentDocType === 'accept') {
     notices += '<div class="notice-box">紙に印刷して取り交わす場合、収入印紙(税金の印紙)が必要になることがあります。' +
       'PDFのままメール等でやり取りする場合は不要というのが一般的な取り扱いです。紙にする場合は税務署にご確認ください。</div>';
+  }
+  if (currentDocType === 'receipt') {
+    notices += '<div class="notice-box">紙の領収書は、受取金額が5万円以上だと収入印紙(税金の印紙)が必要になることがあります。' +
+      'PDFのままメール等で渡す場合は不要というのが一般的な取り扱いです。紙にする場合は税務署にご確認ください。</div>';
+  }
+  if (currentDocType === 'invoice' && !state.settings.issuer.bankInfo) {
+    notices += '<div class="notice-box">振込先口座が未入力です。「⑤設定」の「振込先口座」に入力すると、請求書に印字されます。</div>';
   }
 
   el.innerHTML =
@@ -642,16 +685,26 @@ function renderPreview() {
   const mi = $('#m-issue');
   if (mi) mi.addEventListener('change', e => {
     const prevIssue = doc.issueDate;                        // 代入の前に旧発行日を取る(順番が大事)
-    const wasAuto = doc.expiry === addMonths(prevIssue, 1); // 期限=旧発行日+1ヶ月なら「自動値のまま」
+    const wasAutoExpiry = doc.expiry === addMonths(prevIssue, 1);   // 期限=旧発行日+1ヶ月なら「自動値のまま」
+    const wasAutoDue = doc.due === endOfNextMonth(prevIssue);       // 支払期限=旧発行日の翌月末なら「自動値のまま」
     doc.issueDate = e.target.value;
     // 期限が自動値のままのときだけ追随させる。手直し済みならユーザーの決めた期限を尊重して変えない
-    if (currentDocType === 'quote' && doc.issueDate && wasAuto) {
+    if (currentDocType === 'quote' && doc.issueDate && wasAutoExpiry) {
       doc.expiry = addMonths(doc.issueDate, 1);
+    }
+    if (currentDocType === 'invoice' && doc.issueDate && wasAutoDue) {
+      doc.due = endOfNextMonth(doc.issueDate);
     }
     persist(c); renderPreview();
   });
   const me = $('#m-expiry');
   if (me) me.addEventListener('change', e => { doc.expiry = e.target.value; persist(c); refreshSheet(c); });
+  const md = $('#m-due');
+  if (md) md.addEventListener('change', e => { doc.due = e.target.value; persist(c); refreshSheet(c); });
+  const mp = $('#m-proviso');
+  if (mp) mp.addEventListener('change', e => { doc.proviso = e.target.value; persist(c); refreshSheet(c); });
+  const mw = $('#m-withholding');
+  if (mw) mw.addEventListener('change', e => { doc.withholding = e.target.checked; persist(c); refreshSheet(c); });
   $('#btn-print').onclick = () => window.print();
   $('#btn-back-edit').onclick = () => showScreen('edit');
 }
@@ -683,14 +736,16 @@ function linesTable(c) {
     '<th style="width:9%">単位</th><th style="width:16%">単価(円)</th><th style="width:16%">金額(円)</th></tr></thead>' +
     '<tbody>' + rows + '</tbody></table>';
 }
-function totalsTable(c) {
+function totalsTable(c, extraRowsHtml) {
   const t = caseTotals(c);
   const taxRows = t.taxRows.map(r =>
     '<tr><td>消費税(' + r.rate + '%・' + ROUND_LABEL[t.mode] + ')</td><td class="num">' + fmt(r.tax) + '円</td></tr>').join('');
   return '<table class="doc-totals">' +
     '<tr><td>税抜合計</td><td class="num">' + fmt(t.net) + '円</td></tr>' +
     (taxRows || '<tr><td>消費税</td><td class="num">0円</td></tr>') +
-    '<tr class="grand"><td>税込合計</td><td class="num">' + fmt(t.gross) + '円</td></tr></table>';
+    '<tr class="grand"><td>税込合計</td><td class="num">' + fmt(t.gross) + '円</td></tr>' +
+    (extraRowsHtml || '') +  // 請求書の源泉徴収など、税込合計の下に足す行
+    '</table>';
 }
 function clientTo(c) {
   return '<div class="doc-to">' + esc(c.clientName || '　　　　　　　　') + ' 御中</div>';
@@ -742,6 +797,56 @@ function buildDoc(c, type) {
       (c.docs.quote.number ? '(見積番号: ' + esc(c.docs.quote.number) + ')' : '') + '</p>' +
       '<div class="doc-amount-box">御請負金額(税込): ' + fmt(t.gross) + '円</div>' +
       linesTable(c) + totalsTable(c) + issuerBlock(false);
+  }
+
+  if (type === 'delivery') {
+    return '<h1 class="doc-title">納品書</h1>' +
+      '<div class="doc-head">' + clientTo(c) +
+      '<div class="doc-meta">納品書番号: ' + esc(doc.number) + '<br>納品日: ' + esc(fmtDate(doc.issueDate)) + '</div></div>' +
+      '<p class="doc-lead">下記のとおり、納品いたしました。ご査収のほどお願い申し上げます。</p>' +
+      '<p class="doc-subject">件名: ' + esc(c.title || '') +
+      (c.docs.quote.number ? '(見積番号: ' + esc(c.docs.quote.number) + ')' : '') + '</p>' +
+      linesTable(c) + totalsTable(c) + issuerBlock(false);
+  }
+
+  if (type === 'invoice') {
+    // 源泉徴収税額は税抜金額に対する10.21%(整数の円へ切り捨て)。整数演算で誤差を避ける
+    const wh = doc.withholding ? Math.floor(t.net * 1021 / 10000) : 0;
+    const billed = t.gross - wh;
+    const whRows = wh
+      ? '<tr><td>源泉徴収税額(10.21%)</td><td class="num">▲' + fmt(wh) + '円</td></tr>' +
+        '<tr class="grand"><td>差引ご請求金額</td><td class="num">' + fmt(billed) + '円</td></tr>'
+      : '';
+    return '<h1 class="doc-title">御請求書</h1>' +
+      '<div class="doc-head">' + clientTo(c) +
+      '<div class="doc-meta">請求書番号: ' + esc(doc.number) + '<br>発行日: ' + esc(fmtDate(doc.issueDate)) +
+      '<br>お支払期限: ' + esc(fmtDate(doc.due)) + '</div></div>' +
+      '<p class="doc-lead">下記のとおり、ご請求申し上げます。</p>' +
+      '<p class="doc-subject">件名: ' + esc(c.title || '') +
+      (c.docs.quote.number ? '(見積番号: ' + esc(c.docs.quote.number) + ')' : '') + '</p>' +
+      '<div class="doc-amount-box">ご請求金額(税込): ' + fmt(billed) + '円</div>' +
+      linesTable(c) + totalsTable(c, whRows) +
+      (s.bankInfo ? '<div class="doc-box"><h4>お振込先</h4>' + esc(s.bankInfo) +
+        '<br>※恐れ入りますが、振込手数料はご負担をお願いいたします。</div>' : '') +
+      (c.note ? '<div class="doc-box"><h4>備考</h4>' + nl2br(c.note) + '</div>' : '') +
+      issuerBlock(false) +
+      (wh ? '<p class="doc-footnote">※源泉徴収税額は、税抜金額に対する10.21%です。</p>' : '');
+  }
+
+  if (type === 'receipt') {
+    const proviso = doc.proviso || (c.title ? c.title + ' の代金として' : 'お品代として');
+    const breakdown = t.taxRows.map(r =>
+      '内訳: 税抜金額 ' + fmt(r.net) + '円 / 消費税(' + r.rate + '%) ' + fmt(r.tax) + '円').join('<br>') ||
+      '内訳: 税抜金額 ' + fmt(t.net) + '円 / 消費税 0円';
+    return '<h1 class="doc-title">領収書</h1>' +
+      '<div class="doc-head">' + clientTo(c) +
+      '<div class="doc-meta">領収書番号: ' + esc(doc.number) + '<br>発行日: ' + esc(fmtDate(doc.issueDate)) + '</div></div>' +
+      '<div class="doc-amount-box" style="font-size:20px">領収金額: ' + fmt(t.gross) + '円 (税込)</div>' +
+      '<p class="doc-lead">但し、' + esc(proviso) + '</p>' +
+      '<p class="doc-lead">上記の金額を、正に領収いたしました。</p>' +
+      '<div class="doc-box">' + breakdown + '</div>' +
+      issuerBlock(false) +
+      '<p class="doc-footnote">※紙でお渡しする場合、受取金額5万円以上は収入印紙が必要になることがあります(電子・PDFは不要が一般的)。</p>';
   }
 
   /* 契約書: ひな形にデータを差し込む「清書」だけを行う(条文は生成しない) */
